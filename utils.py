@@ -2,6 +2,31 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 
+def compute_weighted_adj(node_coordinates):
+    from sklearn.metrics.pairwise import euclidean_distances
+    sq_pairwise_dist_mat = np.square(euclidean_distances(node_coordinates))
+    sigma = np.std(sq_pairwise_dist_mat.flatten())
+    adj_w = np.exp((-1) * (sq_pairwise_dist_mat / sigma**2))
+    return adj_w
+
+def log_values(train_loss, ):
+    avg_cost = cost.mean().item()
+    grad_norms, grad_norms_clipped = grad_norms
+
+    # Log values to screen
+    print('epoch: {}, train_batch_id: {}, avg_cost: {}'.format(epoch, batch_id, avg_cost))
+
+    print('grad_norm: {}, clipped: {}'.format(grad_norms[0], grad_norms_clipped[0]))
+
+    # Log values to tensorboard
+    if not opts.no_tensorboard:
+        tb_logger.log_value('avg_cost', avg_cost, step)
+
+        # tb_logger.log_value('actor_loss', reinforce_loss.item(), step)
+        # tb_logger.log_value('nll', -log_likelihood.mean().item(), step)
+
+        # tb_logger.log_value('grad_norm', grad_norms[0], step)
+        # tb_logger.log_value('grad_norm_clipped', grad_norms_clipped[0], step)
 
 def encode_onehot(labels):
     classes = set(labels)
@@ -66,10 +91,11 @@ def normalize(mx):
 def accuracy(output, labels):
     # input('enter output')
     # print(output)
-    preds = output.max(1)[1].type_as(labels)
+    preds = torch.sigmoid(output) > 0.5
+    preds = preds.type(torch.cuda.FloatTensor)
     # input('enter preds')
     # print(preds)
-    # input('wait')
+    # input('see and press enter')
     correct = preds.eq(labels).double()
     correct = correct.sum()
     return correct / len(labels)

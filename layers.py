@@ -35,7 +35,7 @@ class GraphConvolution(Module):
         # print(self.weight, self.weight.shape)
         support = torch.mm(in_put, self.weight)
         # input('enter for support')
-        # print(support, support.shape)
+        # print(support, support.shape) 
         output = torch.mm(adj, support)
         # input('enter for output')
         # print(output, output.shape)

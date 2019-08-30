@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
@@ -20,4 +21,4 @@ class GCN(nn.Module):
         # x = F.dropout(x, self.dropout, training=self.training)
         x = self.gc2(x, adj)
 
-        return torch.sigmoid(x)
+        return x #torch.sigmoid(x)
