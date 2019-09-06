@@ -21,9 +21,6 @@ class GCN(nn.Module):
         # x = F.dropout(x, self.dropout, training=self.training)
         node_embeddings = x
         x = self.gc2(x, adj)
-
-        # return x when binary_cross_entropy_with_logits loss is used
-        # return x #torch.sigmoid(x)
         
         # return output of softmax layer when NLLLoss is used
         return nn.LogSoftmax(dim=1)(x), node_embeddings
