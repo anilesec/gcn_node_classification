@@ -14,6 +14,7 @@ def compute_weighted_adj(node_coordinates):
 def log_values(epoch, loss_train, loss_val, acc_train, acc_val, tb_logger):
     
     # log values to screen
+    # <---->
 
     # Log values to tensorboard
     tb_logger.log_value('loss_train', loss_train, epoch)
@@ -83,16 +84,8 @@ def normalize(mx):
 
 
 def accuracy(output, labels):
-    # input('enter output')
-    # print(output)
     preds = torch.max(output, 1)[1]
-    # preds = preds.type(torch.cuda.FloatTensor)
-    # input('enter preds')
-    # print(preds)
-    # input('wauit')
-    # input('see and press enter')
-    correct = (preds==labels).sum()
-    correct = correct.sum()
+    correct = torch.sum((labels.squeeze()==preds), dtype=torch.float)
     return correct / len(labels)
 
 
