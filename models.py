@@ -17,8 +17,13 @@ class GCN(nn.Module):
         # input("enter")
         # print(adj)
         # input('enter to continue')
-        x = F.relu(self.gc1(x, adj))
+        x = torch.tanh(self.gc1(x, adj))
         # x = F.dropout(x, self.dropout, training=self.training)
+        node_embeddings = x
         x = self.gc2(x, adj)
 
-        return x #torch.sigmoid(x)
+        # return x when binary_cross_entropy_with_logits loss is used
+        # return x #torch.sigmoid(x)
+        
+        # return output of softmax layer when NLLLoss is used
+        return nn.LogSoftmax(dim=1)(x), node_embeddings
