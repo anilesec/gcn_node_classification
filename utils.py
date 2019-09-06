@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.sparse as sp
 import torch
+import os
+import pickle
 
 def compute_weighted_adj(node_coordinates):
     from sklearn.metrics.pairwise import euclidean_distances
@@ -83,12 +85,13 @@ def normalize(mx):
 def accuracy(output, labels):
     # input('enter output')
     # print(output)
-    preds = torch.sigmoid(output) > 0.5
-    preds = preds.type(torch.cuda.FloatTensor)
+    preds = torch.max(output, 1)[1]
+    # preds = preds.type(torch.cuda.FloatTensor)
     # input('enter preds')
     # print(preds)
+    # input('wauit')
     # input('see and press enter')
-    correct = preds.eq(labels).double()
+    correct = (preds==labels).sum()
     correct = correct.sum()
     return correct / len(labels)
 
@@ -101,3 +104,22 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     values = torch.from_numpy(sparse_mx.data)
     shape = torch.Size(sparse_mx.shape)
     return torch.sparse.FloatTensor(indices, values, shape)
+
+def check_extension(filename):
+    if os.path.splitext(filename)[1] != ".pkl":
+        return filename + ".pkl"
+    return filename
+
+def load_dataset(filename):
+    with open(check_extension(filename), 'rb') as f:
+        return pickle.load(f)
+
+
+def save_dataset(dataset, filename):
+    filedir = os.path.split(filename)[0]
+
+    if not os.path.isdir(filedir):
+        os.makedirs(filedir)
+
+    with open(check_extension(filename), 'wb') as f:
+        pickle.dump(dataset, f, pickle.HIGHEST_PROTOCOL)
