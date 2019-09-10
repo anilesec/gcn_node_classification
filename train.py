@@ -49,15 +49,17 @@ if __name__ == "__main__":
     # parser.add_argument('--fastmode', action='store_true', default=False,
     #                     help='Validate during training pass.')
     parser.add_argument('--seed', type=int, default=42, help='Random seed.')
-    parser.add_argument('--epochs', type=int, default=30,
+    parser.add_argument('--epochs', type=int, default=50,
                         help='Number of epochs to train.')
-    parser.add_argument('--lr', type=float, default=0.001,
+    parser.add_argument('--lr', type=float, default=0.0005,
                         help='Initial learning rate.')
-    parser.add_argument('--weight_decay', type=float, default=1e-6,
+    parser.add_argument('--weight_decay', type=float, default=0.000001,
                         help='Weight decay (L2 loss on parameters).')
-    parser.add_argument('--hidden', type=int, default=16,
+    parser.add_argument('--hidden_dim', type=int, default=128,
                         help='Number of hidden units.')
-    parser.add_argument('--dropout', type=float, default=0.2,
+    parser.add_argument('--num_hid_layers', type=int, default=2,
+                        help='Number of hidden layers.')
+    parser.add_argument('--dropout', type=float, default=0.5,
                         help='Dropout rate (1 - keep probability).')
     parser.add_argument('--no_tensorboard', action='store_true', 
                         help='Disable logging TensorBoard files')
@@ -86,10 +88,10 @@ if __name__ == "__main__":
     val_dataset = val_dataset[0:1000]
 
     # disable sync
-    os.environ['WANDB_MODE'] = 'dryrun'
+    # os.environ['WANDB_MODE'] = 'dryrun'
 
     # initialize wandb
-    wandb.init(project='gcn_node_classification')
+    wandb.init(project='gcn_node_classification_after_tuning')
     # load all arguments to config to save as hyperparameters
     wandb.config.update(args)
 
@@ -100,13 +102,14 @@ if __name__ == "__main__":
         tb_logger = TbLogger(os.path.join(args.log_dir, args.run_name))
 
     # model
-    model = GCN(nfeat=train_dataset[0].x.shape[1],
-                nhid=args.hidden,
-                nclass=2,
+    model = GCN(input_dim=train_dataset[0].x.shape[1],
+                num_hid_layers=args.num_hid_layers,
+                hidden_dim=args.hidden_dim,
+                num_class=2,
                 dropout=args.dropout)
     # optimizer
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    # optimizer = optim.SGD(model.parameters(), lr=args.lr)
+    # optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
     # save pytorch model and track all of the gradients and optionally parameters
     wandb.watch(model, log='all')  # "gradients", "parameters", "all", or None.
