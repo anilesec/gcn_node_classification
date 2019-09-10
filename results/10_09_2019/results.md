@@ -1,4 +1,4 @@
-## GCN node classification Hyper parametere tuning
+## GCN node classification hyperparameter tuning
 
 ### Parameters tuned:
 - Learning rate
@@ -7,6 +7,7 @@
 
 ### Code:
 - [Link](https://github.com/anilesec/gcn_node_classification)
+    * Repository
 
 ### All Logs:
 - [Link1](https://app.wandb.ai/aniles-ec/gcn_node_classification_hype_2?workspace=user-aniles-ec)
@@ -44,3 +45,7 @@
     hid_layer_dim: 128
     no_hid_layers(gcn): 2
 
+#### Observations:
+- Even though amount of learning is less, accuracy did improve
+- Accurcay and loss still shows increasing and decreasing trend respectively, perhaps can train for more epochs(untill early stopping)*
+- SGD optimizer is used
