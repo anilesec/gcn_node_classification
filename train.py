@@ -13,9 +13,55 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torch.optim as optim
 
-from utils import load_data, accuracy, compute_weighted_adj, log_values, load_dataset, save_dataset
+from utils import load_data, accuracy, compute_weighted_adj
+from utils import log_values, load_dataset, save_dataset
 from tensorboard_logger import Logger as TbLogger
 from models import GCN
+
+
+class EarlyStopping:
+    """Early stops the training if validation loss doesn't improve after a given patience."""
+    def __init__(self, patience=7, verbose=False, delta=0):
+        """
+        Args:
+            patience (int): How long to wait after last time validation loss improved.
+                            Default: 7
+            verbose (bool): If True, prints a message for each validation loss improvement. 
+                            Default: False
+            delta (float): Minimum change in the monitored quantity to qualify as an improvement.
+                            Default: 0
+        """
+        self.patience = patience
+        self.verbose = verbose
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.val_loss_min = np.Inf
+        self.delta = delta
+
+    def __call__(self, val_loss, model, epoch):
+
+        score = -val_loss
+
+        if self.best_score is None:
+            self.best_score = score
+            self.save_checkpoint(val_loss, model, str(epoch))
+        elif score < self.best_score - self.delta:
+            self.counter += 1
+            print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            self.save_checkpoint(val_loss, model, str(epoch))
+            self.counter = 0
+
+    def save_checkpoint(self, val_loss, model, model_name):
+        '''Saves model when validation loss decrease.'''
+        if self.verbose:
+            print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+        torch.save(model.state_dict(), 'pretrained/checkpoint.pt')
+        self.val_loss_min = val_loss
 
 
 def train(model, train_features, train_labels, train_adj):
@@ -49,16 +95,18 @@ if __name__ == "__main__":
     # parser.add_argument('--fastmode', action='store_true', default=False,
     #                     help='Validate during training pass.')
     parser.add_argument('--seed', type=int, default=42, help='Random seed.')
-    parser.add_argument('--epochs', type=int, default=50,
+    parser.add_argument('--epochs', type=int, default=1000,
                         help='Number of epochs to train.')
     parser.add_argument('--lr', type=float, default=0.0005,
                         help='Initial learning rate.')
-    parser.add_argument('--weight_decay', type=float, default=0.000001,
-                        help='Weight decay (L2 loss on parameters).')
+    # parser.add_argument('--weight_decay', type=float, default=0.000001,
+    #                     help='Weight decay (L2 loss on parameters).')
     parser.add_argument('--hidden_dim', type=int, default=128,
                         help='Number of hidden units.')
     parser.add_argument('--num_hid_layers', type=int, default=2,
                         help='Number of hidden layers.')
+    parser.add_argument('--es_patience', type=int, default=100,
+                        help='early stopping buffer to check for metric improvement')
     parser.add_argument('--dropout', type=float, default=0.5,
                         help='Dropout rate (1 - keep probability).')
     parser.add_argument('--no_tensorboard', action='store_true', 
@@ -84,8 +132,8 @@ if __name__ == "__main__":
     val_dataset = load_dataset(filename='/nfs/team/mlo/aswamy/code/learn_comb_opt_op/data/op/op_k_sols_dist100_valN10000_seed2222.pkl')
 
     # taking only limited samples for trainnig and validation
-    train_dataset = train_dataset[0:5000]
-    val_dataset = val_dataset[0:1000]
+    train_dataset = train_dataset[0:10000]
+    val_dataset = val_dataset[0:5000]
 
     # disable sync
     # os.environ['WANDB_MODE'] = 'dryrun'
@@ -116,16 +164,17 @@ if __name__ == "__main__":
 
     # Train model
     t_total = time.time()
-    loss_train_lst = []
-    loss_val_lst = []
-    acc_train_lst = []
-    acc_val_lst = []
+    
+    # initialize the early_stopping object
+    early_stopping = EarlyStopping(patience=args.es_patience, verbose=True)
+
     for epoch in range(args.epochs):
         running_loss_train = 0
         running_acc_train = 0
         for i in tqdm(range(len(train_dataset))):
             # data with labels based on approximate solutions
-            train_features = train_dataset[i].x
+            # features are centered to depot location
+            train_features = train_dataset[i].x - torch.cat([train_dataset[i].x[0][:2], torch.tensor([0.0, 0.0])], dim=0)
             # convert true score into labels
             train_labels = train_dataset[i].y > 0
             # create weighted adj using only coordinates
@@ -145,7 +194,7 @@ if __name__ == "__main__":
         running_loss_val = 0
         running_acc_val = 0
         for i in tqdm(range(len(val_dataset))):
-            val_features = val_dataset[i].x
+            val_features = val_dataset[i].x - torch.cat([val_dataset[i].x[0][:2], torch.tensor([0.0, 0.0])], dim=0)
             val_labels = val_dataset[i].y > 0
             val_adj = torch.from_numpy(compute_weighted_adj(val_dataset[i].x[:, :-2]))
 
@@ -160,14 +209,20 @@ if __name__ == "__main__":
             running_loss_val += loss_val.item()
             running_acc_val += acc_val.item()
 
-
+        # early_stopping needs the validation loss to check if it has decresed, 
+        # and if it has, it will make a checkpoint of the current model
+        early_stopping((running_loss_val / len(val_dataset)), model, epoch)
+        if early_stopping.early_stop:
+            print("Early stopping")
+            break
+        
         if epoch % 5 == 0:
             print('Epoch: {:04d}'.format(epoch+1),
                 'loss_train: {:.4f}'.format(running_loss_train / len(train_dataset)),
                 'acc_train: {:.4f}'.format((running_acc_train / len(train_dataset) * 100)),
                 'loss_val: {:.4f}'.format(running_loss_val / len(val_dataset)),
                 'acc_val: {:.4f}'.format((running_acc_val / len(val_dataset) * 100)))
-
+        
         # tensorboard logging
         log_values(epoch, loss_train, loss_val, acc_train, acc_val, tb_logger)
 
@@ -182,7 +237,7 @@ if __name__ == "__main__":
     print("Optimization Finished!")
     print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
 
-    """
+"""
     print('plotting embeddings')
     import itertools
     # get and plot embeddings
